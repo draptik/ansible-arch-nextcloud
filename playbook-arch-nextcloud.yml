@@ -1,0 +1,219 @@
+---
+- name: Nextcloud on Arch playbook
+  hosts: playground
+  become: true
+  become_user: root
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_user: "{{ ansible_user }}"
+  vars_files:
+    - ./group_vars/vars.yml
+    - ./group_vars/vault
+
+  tasks:
+
+    - name: Create the `aur_builder` user
+      become: true
+      ansible.builtin.user:
+        name: aur_builder
+        create_home: true
+        group: wheel
+
+    - name: Allow the `aur_builder` user to run `sudo pacman` without a password
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/11-install-aur_builder
+        line: 'aur_builder ALL=(ALL) NOPASSWD: /usr/bin/pacman'
+        create: true
+        mode: '0440'
+        validate: 'visudo -cf %s'
+
+    - name: Install git and base-devel...
+      community.general.pacman:
+        name:
+          - git
+          - base-devel
+        state: present
+
+    - name: Gather the package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Clone yay repository...
+      become: true
+      become_user: aur_builder
+      ansible.builtin.git:
+        repo: 'https://aur.archlinux.org/yay-bin.git'
+        version: "v11.3.1"
+        dest: ~/yay-bin
+      when: "'yay-bin' not in ansible_facts.packages"
+
+    - name: Create package yay if it hasn't been installed yet...
+      become: true
+      become_user: aur_builder
+      ansible.builtin.command: /usr/bin/makepkg -si --noconfirm
+      args:
+        chdir: ~/yay-bin
+      when: "'yay-bin' not in ansible_facts.packages"
+
+    # https://github.com/kewlfft/ansible-aur
+    - name: Update arch system (using yay)
+      aur:
+        use: yay
+        update_cache: true
+        upgrade: true
+      become: true
+      become_user: aur_builder
+
+    # https://github.com/kewlfft/ansible-aur
+    - name: Install shell-related packages (using yay)
+      aur:
+        use: yay
+        name:
+          - python-pipx
+          - tmux
+          - zsh
+          - bat
+          - htop
+          - starship
+          - tldr
+          - ranger
+          - ripgrep
+          - ripgrep-all
+          - fd
+          - ncdu
+          - jq
+          - neofetch
+          - reflector
+          - kitty-terminfo
+      become: true
+      become_user: aur_builder
+
+    # Nextcloud
+    # --------------------------------------------------------
+    - name: Create the `nextcloud` user
+      become: true
+      ansible.builtin.user:
+        name: "{{ nextcloud_user }}"
+        create_home: true
+        group: wheel
+
+    # Ansible can't change the group of the current signed-in "sudo user".
+    # We will create a new user with sudo rights.
+    # For me, this seems like a bug in Ansible.
+    - name: Allow the `nextcloud_user` to do everything
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/12-install-nextcloud_user
+        line: 'nextcloud_user ALL=(ALL) NOPASSWD: ALL'
+        create: true
+        mode: '0440'
+        validate: 'visudo -cf %s'
+
+    - name: Install docker stuff (using yay)
+      aur:
+        use: yay
+        name:
+          - docker
+          - docker-compose
+          - python-pip
+          - python-setuptools
+          - python-docker
+      become: true
+      become_user: aur_builder
+
+    - name: Ensure group `docker` exists
+      become: true
+      ansible.builtin.group:
+        name: docker
+        state: present
+
+    - name: Add `nextcloud_user` to group `docker`
+      become: true
+      ansible.builtin.user:
+        name: "{{ nextcloud_user }}"
+        groups: docker
+        append: true
+
+    - name: Enable `docker` service
+      become: true
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Create 'nextcloud_network' docker network
+      community.docker.docker_network:
+        name: nextcloud_network
+
+    - name: Create nextcloud directory
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      ansible.builtin.file:
+        path: ~/nextcloud
+        state: directory
+        mode: '0755'
+
+    - name: Copy nextcloud resource templates (1/4)
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      ansible.builtin.template:
+        src: ./resources/.env.j2
+        dest: ~/nextcloud/.env
+        mode: '0644'
+
+    - name: Copy nextcloud resource templates (2/4)
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      ansible.builtin.template:
+        src: ./resources/docker-compose.yml.j2
+        dest: ~/nextcloud/docker-compose.yml
+        mode: '0644'
+    
+    - name: Copy nextcloud resource templates (3/4)
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      ansible.builtin.template:
+        src: ./resources/nginx.conf
+        dest: ~/nextcloud/nginx.conf
+        mode: '0644'
+    
+    - name: Copy nextcloud resource templates (4/4)
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      ansible.builtin.template:
+        src: ./resources/php-fpm-www.conf
+        dest: ~/nextcloud/php-fpm-www.conf
+        mode: '0644'
+
+    - name: Get infos on container
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      docker_container_info:
+        name: nextcloud-web # see docker-compose.yml: services -> web -> container_name
+      register: docker_result
+
+    - name: Stop docker-compose (why is this needed?)
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      community.docker.docker_compose:
+        project_src: ~/nextcloud # location of docker-compose.{yml,env} files
+        stopped: true
+        state: absent
+      when: docker_result.exists
+
+    - name: Start docker-compose
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      community.docker.docker_compose:
+        project_src: ~/nextcloud # location of docker-compose.{yml,env} files
+        pull: true # Use with state present to always pull images prior to starting the application.
+        state: present # Specifying present is the same as running docker-compose up
+
+    - name: Copy bashrc for nextcloud_user
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      ansible.builtin.copy:
+        src: ./resources/bashrc
+        dest: ~/.bashrc
+        mode: '0644'

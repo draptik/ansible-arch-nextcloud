@@ -1,0 +1,16 @@
+---
+ansible_user: patrick
+nextcloud_user: nextcloud_user
+
+nas_user: patrick
+nas_name: turtle
+
+restic_password_file_location: "/root/restic-pw"
+restic_repo_name: "restic-nextcloud"
+
+# Vault
+restic_password: "{{ vault_restic_password }}"
+nextcloud_admin_password: "{{ vault_nextcloud_admin_password }}"
+mysql_root_password: "{{ vault_mysql_root_password }}"
+mysql_password: "{{ vault_mysql_password }}"
+nextcloud_domain: "{{ vault_nextcloud_domain }}"
