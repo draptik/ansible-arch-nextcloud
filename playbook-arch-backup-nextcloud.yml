@@ -1,0 +1,97 @@
+---
+- name: Initial setup for Nextcloud backup using Restic
+  hosts: playground
+  become: true
+  become_user: root
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_user: patrick
+  vars_files:
+    - ./group_vars/vars.yml
+    - ./group_vars/vault
+
+  tasks:
+
+    - name: Gather the package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Update arch system (using yay)
+      aur:
+        use: yay
+        update_cache: true
+        upgrade: true
+      become: true
+      become_user: aur_builder
+
+    - name: Install restic (using yay)
+      aur:
+        use: yay
+        name:
+          - restic
+      become: true
+      become_user: aur_builder
+
+    - name: Copy ssh script
+      become: true
+      become_user: root
+      ansible.builtin.template:
+        src: ./resources/ssh-copy-id-to-nas.sh.j2
+        dest: /home/{{ nextcloud_user }}/nextcloud/ssh-copy-id-to-nas.sh
+        mode: '0744'
+
+    - name: Copy backup script
+      become: true
+      become_user: root
+      ansible.builtin.template:
+        src: ./resources/backup-nextcloud-restic2nas.sh.j2
+        dest: /home/{{ nextcloud_user }}/nextcloud/backup-nextcloud-restic2nas.sh
+        mode: '0744'
+
+    - name: Copy restic restore/check script
+      become: true
+      become_user: root
+      ansible.builtin.template:
+        src: ./resources/backup-restore-ideas.sh.j2
+        dest: /home/{{ nextcloud_user }}/nextcloud/backup-restore-ideas.sh
+        mode: '0744'
+
+    - name: Create SSH keypair (if it doesn't exist yet)
+      become: true
+      become_user: root
+      community.crypto.openssh_keypair:
+        path: ~/.ssh/id_rsa
+        passphrase: ""
+        comment: nextcloud_restic_sheep
+    
+    - name: Copy systemd service
+      become: true
+      become_user: root
+      ansible.builtin.template:
+        src: ./resources/systemd/backup-nextcloud.service.j2
+        dest: /etc/systemd/system/backup-nextcloud.service
+        mode: '0644'
+
+    - name: Copy systemd timer
+      become: true
+      become_user: root
+      ansible.builtin.copy:
+        src: ./resources/systemd/backup-nextcloud.timer
+        dest: /etc/systemd/system/backup-nextcloud.timer
+        mode: '0644'
+
+    - name: Copy restic password file to target
+      become: true
+      become_user: root
+      ansible.builtin.template:
+        src: ./resources/restic-pw.j2
+        dest: /root/restic-pw
+        mode: '0600'
+      
+    - name: Start and enable system.d timer for restic backup
+      become: true
+      become_user: root
+      ansible.builtin.systemd:
+        name: backup-nextcloud.timer
+        state: started
+        enabled: yes

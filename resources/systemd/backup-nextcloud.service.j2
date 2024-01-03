@@ -1,0 +1,11 @@
+[Unit]
+Description=Backup nextcloud docker volumes to NAS using restic (triggered by systemd timer)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/home/{{ nextcloud_user }}/nextcloud/backup-nextcloud-restic2nas.sh
+
+[Install]
+WantedBy=multi-user.target

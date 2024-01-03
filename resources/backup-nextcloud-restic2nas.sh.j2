@@ -1,0 +1,79 @@
+#!/bin/bash
+# -*- mode:sh -*-
+
+## Assumptions:
+##
+##  - Restic is installed
+##  - Restic repo exists on NAS
+##  - SFTP works without credentials
+##
+## This script must be executed as root on the target system.
+## Why? Only root has access to the docker volumes.
+
+set -o nounset
+set -o errexit
+
+readonly LOG_FILE="/home/{{ nextcloud_user }}/nextcloud/nextcloud_backup.log"
+readonly DOCKER_LOG_FILE="/home/{{ nextcloud_user }}/nextcloud/nextcloud_backup_docker.log"
+
+function timestamp () {
+    printf "%(%Y-%m-%d %H:%M:%S)T"
+}
+
+printf "%s =======================\n%s START...\n" "$(timestamp)" "$(timestamp)" >> "${LOG_FILE}"
+
+## NAS Settings ----------------------------------
+readonly NAS_USER="{{ nas_user }}"
+readonly NAS_NAME="{{ nas_name }}"
+readonly REPO_NAME="{{ restic_repo_name }}"
+readonly REPO=$NAS_USER@$NAS_NAME:$REPO_NAME
+
+## NEXTCLOUD docker volume paths -----------------
+readonly NEXTCLOUD_DOCKER_VOLUME_DATA=/var/lib/docker/volumes/nextcloud_data
+readonly NEXTCLOUD_DOCKER_INTERNAL_VOLUME_DATA=/var/lib/docker/volumes/nextcloud_nextcloud_data
+
+## Docker compose script location ----------------
+readonly DOCKER_COMPOSE_DIRECTORY="/home/{{ nextcloud_user }}/nextcloud"
+
+## Shut down docker-compose ----------------------
+printf "%s Shutting down docker...\n" "$(timestamp)" >> "${LOG_FILE}"
+# shellcheck disable=SC2129
+printf "%s Shutting down docker...\n" "$(timestamp)" >> "${DOCKER_LOG_FILE}"
+
+docker-compose \
+    --project-directory="${DOCKER_COMPOSE_DIRECTORY}" \
+    down \
+    >> "${DOCKER_LOG_FILE}" 2>&1
+
+printf "%s Finished shutting down docker...\n" "$(timestamp)" >> "${DOCKER_LOG_FILE}"
+
+## The actual backups... -------------------------
+readonly RESTIC_PASSWORD_FILE="{{ restic_password_file_location }}"
+
+# shellcheck disable=SC2129
+printf "%s RESTIC: Trying to backup the following folders to NAS (\"$REPO\"): ${NEXTCLOUD_DOCKER_VOLUME_DATA}...\n" "$(timestamp)" >> "${LOG_FILE}"
+
+restic \
+    --repo sftp:"$REPO" \
+    --password-file "${RESTIC_PASSWORD_FILE}" \
+    backup \
+        "${NEXTCLOUD_DOCKER_VOLUME_DATA}" \
+        "${NEXTCLOUD_DOCKER_INTERNAL_VOLUME_DATA}" \
+    >> "${LOG_FILE}" 2>&1
+
+printf "%s Finished with RESTIC.\n" "$(timestamp)" >> "${LOG_FILE}"
+
+## Restart docker-compose ------------------------
+printf "%s Restarting docker...\n" "$(timestamp)" >> "${LOG_FILE}"
+# shellcheck disable=SC2129
+printf "%s Restarting docker...\n" "$(timestamp)" >> "${DOCKER_LOG_FILE}"
+
+docker-compose \
+    --project-directory="${DOCKER_COMPOSE_DIRECTORY}" \
+    up \
+    --detach \
+    >> "${DOCKER_LOG_FILE}" 2>&1
+
+printf "%s Finished restarting docker...\n" "$(timestamp)" >> "${DOCKER_LOG_FILE}"
+
+printf "%s DONE.\n%s -----------------------\n" "$(timestamp)" "$(timestamp)" >> "${LOG_FILE}"

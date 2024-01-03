@@ -1,0 +1,42 @@
+#!/bin/bash
+# -*- mode:sh -*-
+
+## This script should not be run automatically!
+##
+## It contains ideas (!) on how to restore paperless-ngx docker volumes from NAS using Restic
+
+set -o nounset
+set -o errexit
+
+## NAS Settings ----------------------------------
+readonly NAS_USER="{{ nas_user }}"
+readonly NAS_NAME="{{ nas_name }}"
+readonly REPO_NAME="{{ restic_repo_name }}"
+readonly REPO=$NAS_USER@$NAS_NAME:$REPO_NAME
+
+## Restic settings -------------------------------
+readonly RESTIC_PASSWORD_FILE="{{ restic_password_file_location }}"
+
+## Check Restic ----------------------------------
+## `restic check --read-data` does a consistency check:
+restic \
+    --repo sftp:"$REPO" \
+    --password-file "${RESTIC_PASSWORD_FILE}" \
+    check \
+    --read-data
+
+
+## Restic restore ----------------------------------
+readonly TMP_RESTORE_FOLDER="/home/{{ nextcloud_user }}/tmp/restore-target"
+mkdir -p "${TMP_RESTORE_FOLDER}"
+
+## see https://www.shellcheck.net/wiki/SC2115
+rm -rf "${TMP_RESTORE_FOLDER:?}"/*
+
+restic \
+    --repo sftp:"$REPO" \
+    --password-file "${RESTIC_PASSWORD_FILE}" \
+    restore \
+    latest \
+    --verify \
+    --target "${TMP_RESTORE_FOLDER}"
