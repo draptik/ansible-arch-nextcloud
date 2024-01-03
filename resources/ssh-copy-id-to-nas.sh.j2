@@ -9,6 +9,6 @@ set -o errexit
 
 readonly SSH_PUBLIC_KEY=/root/.ssh/id_rsa.pub
 readonly NAS={{ nas_user }}@{{ nas_name }}
-readonly LOCK_FILE=/home/{{ paperless_user }}/paperless-ngx/ssh-copy-id-to-nas.lock
+readonly LOCK_FILE=/home/{{ nextcloud_user }}/nextcloud/ssh-copy-id-to-nas.lock
 
 ssh-copy-id $SSH_PUBLIC_KEY $NAS && touch $LOCK_FILE
