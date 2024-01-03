@@ -13,3 +13,4 @@ PS1='[\u@\h \W]\$ '
 ##
 alias ll='ls -alh'
 alias lc='ls -alh'
+alias l='ls -alh'
