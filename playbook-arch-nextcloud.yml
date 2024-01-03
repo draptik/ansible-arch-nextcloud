@@ -98,6 +98,14 @@
         create_home: true
         group: wheel
 
+    - name: Copy bashrc for nextcloud_user
+      become: true
+      become_user: "{{ nextcloud_user }}"
+      ansible.builtin.copy:
+        src: ./resources/bashrc
+        dest: ~/.bashrc
+        mode: '0644'
+        
     # Ansible can't change the group of the current signed-in "sudo user".
     # We will create a new user with sudo rights.
     # For me, this seems like a bug in Ansible.
@@ -210,10 +218,3 @@
         pull: true # Use with state present to always pull images prior to starting the application.
         state: present # Specifying present is the same as running docker-compose up
 
-    - name: Copy bashrc for nextcloud_user
-      become: true
-      become_user: "{{ nextcloud_user }}"
-      ansible.builtin.copy:
-        src: ./resources/bashrc
-        dest: ~/.bashrc
-        mode: '0644'
