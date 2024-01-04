@@ -51,7 +51,7 @@ printf "%s Finished shutting down docker...\n" "$(timestamp)" >> "${DOCKER_LOG_F
 readonly RESTIC_PASSWORD_FILE="{{ restic_password_file_location }}"
 
 # shellcheck disable=SC2129
-printf "%s RESTIC: Trying to backup the following folders to NAS (\"$REPO\"): ${NEXTCLOUD_DOCKER_VOLUME_DATA}...\n" "$(timestamp)" >> "${LOG_FILE}"
+printf "%s RESTIC: Trying to backup the following folders to NAS (\"$REPO\"): ${NEXTCLOUD_DOCKER_VOLUME_DATA}, ${NEXTCLOUD_DOCKER_INTERNAL_VOLUME_DATA}...\n" "$(timestamp)" >> "${LOG_FILE}"
 
 restic \
     --repo sftp:"$REPO" \
