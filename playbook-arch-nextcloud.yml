@@ -112,7 +112,7 @@
     - name: Allow the `nextcloud_user` to do everything
       become: true
       ansible.builtin.lineinfile:
-        path: /etc/sudoers.d/12-install-nextcloud_user
+        path: /etc/sudoers.d/13-install-nextcloud_user
         line: 'nextcloud_user ALL=(ALL) NOPASSWD: ALL'
         create: true
         mode: '0440'
