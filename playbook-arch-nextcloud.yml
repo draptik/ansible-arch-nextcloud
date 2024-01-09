@@ -201,7 +201,10 @@
         name: nextcloud-web # see docker-compose.yml: services -> web -> container_name
       register: docker_result
 
-    - name: Stop docker-compose (why is this needed?)
+    # We have to do this manually, otherwise the containers are restarted automatically because of `restart: unless-stopped` in docker-compose
+    # TODO: This crashes because 'ModuleNotFoundError: No module named 'compose''.
+    # On the same system host/target combo, using paperless, everything is fine. I'm guessing this is a user privilege problem, but, I have no idea.
+    - name: Stop docker-compose
       become: true
       become_user: "{{ nextcloud_user }}"
       community.docker.docker_compose:
