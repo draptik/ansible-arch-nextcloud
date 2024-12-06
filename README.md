@@ -1,11 +1,11 @@
 # Nextcloud in Docker via Ansible
 
-Inspired by https://linuxiac.com/how-to-install-nextcloud-with-docker-compose/
+Inspired by <https://linuxiac.com/how-to-install-nextcloud-with-docker-compose/>
 
 ## Credentials
 
-- Credentials are handled using Ansible Vault. 
-- The vault password is stored in a file called `.vault_pass` in the root of this repository. 
+- Credentials are handled using Ansible Vault.
+- The vault password is stored in a file called `.vault_pass` in the root of this repository.
 - It is not checked into git.
 - Add `.vault_pass` to your `.gitignore` file.
 - Add the content of `.vault_pass` to your password manager.
@@ -26,7 +26,8 @@ Inspired by https://linuxiac.com/how-to-install-nextcloud-with-docker-compose/
 
 - ssh into server
 - run the following command:
-  ```
+
+  ```sh
   docker exec --user 33 -it nextcloud-app php occ db:add-missing-indices
   ```
 
@@ -34,7 +35,8 @@ Inspired by https://linuxiac.com/how-to-install-nextcloud-with-docker-compose/
 
 - ssh into server
 - run the following command:
-  ```
+
+  ```sh
   docker exec --user 33 -it nextcloud-app php occ config:system:set maintenance-window_start --type=integer --value=1
   ```
 
@@ -42,7 +44,8 @@ Inspired by https://linuxiac.com/how-to-install-nextcloud-with-docker-compose/
 
 - ssh into server
 - run the following command:
-  ```
+
+  ```sh
   docker exec --user 33 -it nextcloud-app php occ config:system:set default_phone_region --value="DE"
   ```
 
@@ -62,4 +65,3 @@ Inspired by https://linuxiac.com/how-to-install-nextcloud-with-docker-compose/
   - Credentials
     - User: gmail address
     - Password: use app password from gmail
-
